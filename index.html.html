@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ScaleUp Intelligence | Expériences Web Immersives</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@1,2,3,4,5,6&f[]=satoshi@1,2,3,4,5,6,7&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/@studio-freight/lenis@1.0.33/dist/lenis.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #05030a;
+            --text: #f4f0ff;
+            --text-muted: #9ca3af;
+            --accent: #8b5cf6;
+            --accent-light: #c4b5fd;
+            --gradient: linear-gradient(135deg, #c4b5fd 0%, #8b5cf6 50%, #4c1d95 100%);
+            --font-display: 'Clash Display', sans-serif;
+            --font-body: 'Satoshi', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #webgl-canvas {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 0; pointer-events: none;
+        }
+
+        #loader {
+            position: fixed; inset: 0; background: var(--bg);
+            z-index: 9999; display: flex; justify-content: center; align-items: center;
+            transition: opacity 1s ease;
+        }
+        #loader.hidden { opacity: 0; pointer-events: none; }
+        .loader-text { font-family: var(--font-display); font-size: 1.5rem; color: var(--accent-light); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+        /* --- INTRO OVERLAY (Fixe, sans flash) --- */
+        #intro-overlay {
+            position: fixed; inset: 0;
+            z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            pointer-events: none;
+            background: rgba(5, 3, 10, 0.4); 
+            backdrop-filter: blur(2px);
+        }
+
+        .intro-title {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 4rem);
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: 0.1em;
+            text-align: center;
+            margin-bottom: 1rem;
+            text-shadow: 0 0 30px rgba(139, 92, 246, 0.8);
+            opacity: 0; transform: translateY(20px);
+        }
+
+        .intro-subtitle {
+            font-family: var(--font-body);
+            font-size: clamp(1rem, 2vw, 1.5rem);
+            color: var(--accent-light);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            animation: bounce 2s infinite;
+            opacity: 0;
+        }
+
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+
+        /* --- L'ESPACEUR DE SCROLL (100vh) --- */
+        #scroll-spacer { 
+            height: 100vh; 
+            width: 100%; 
+            pointer-events: none; 
+            position: relative; 
+            z-index: 10; 
+        }
+
+        /* --- SITE WEB --- */
+        #site-wrapper {
+            position: relative;
+            z-index: 20;
+            opacity: 0; 
+            visibility: hidden;
+            background: transparent; 
+            pointer-events: none;
+        }
+
+        .nav-header {
+            position: fixed; top: 0; width: 100%; padding: 1.5rem 5vw;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 100; background: linear-gradient(to bottom, rgba(5,3,10,0.9) 0%, rgba(5,3,10,0) 100%);
+            opacity: 0; pointer-events: none;
+        }
+        .logo-container { display: flex; align-items: center; gap: 15px; }
+        .logo-icon { width: 40px; height: 40px; background: var(--gradient); border-radius: 10px; box-shadow: 0 0 20px rgba(139, 92, 246, 0.6); }
+        .logo-text { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; color: #fff; line-height: 1.1; }
+        .nav-links { display: flex; align-items: center; gap: 2.5rem; }
+        .nav-links a { color: var(--text); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.3s; }
+        .nav-links a:hover { color: var(--accent-light); }
+
+        section {
+            min-height: 100vh; display: flex; flex-direction: column; justify-content: center;
+            padding: 15vh 10vw 10vh 10vw; position: relative;
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .tagline-wow { font-family: var(--font-body); font-size: 1rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--accent-light); margin-bottom: 1.5rem; font-weight: 600; display: inline-block; }
+        h1 { font-family: var(--font-display); font-size: clamp(3rem, 6vw, 6.5rem); font-weight: 600; line-height: 1.05; letter-spacing: -0.03em; margin-bottom: 2.5rem; }
+        .text-gradient { background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        h2 { font-family: var(--font-display); font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 500; margin-bottom: 2rem; letter-spacing: -0.02em; line-height: 1.1; }
+        p { font-size: clamp(1.1rem, 1.3vw, 1.3rem); color: var(--text-muted); max-width: 700px; line-height: 1.8; margin-bottom: 3rem; font-weight: 400; }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 1.2rem 2.8rem; font-family: var(--font-body); font-size: 1rem; font-weight: 600;
+            color: #fff; text-decoration: none; background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(196, 181, 253, 0.4); border-radius: 50px;
+            backdrop-filter: blur(10px); transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+        }
+        .btn:hover { background: rgba(139, 92, 246, 0.4); border-color: var(--accent-light); transform: translateY(-3px) scale(1.02); box-shadow: 0 15px 40px rgba(139, 92, 246, 0.5); }
+        .btn-primary { background: var(--gradient); border: none; color: #0a0618; }
+        .btn-primary:hover { box-shadow: 0 15px 50px rgba(139, 92, 246, 0.8); }
+
+        .grid-projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2.5rem; margin-top: 3rem; width: 100%; }
+        .project-card { background: rgba(20, 12, 40, 0.6); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 20px; padding: 3rem 2.5rem; backdrop-filter: blur(20px); transition: all 0.4s; }
+        .project-card:hover { border-color: var(--accent-light); transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+        .project-tag { font-size: 0.75rem; color: var(--accent-light); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem; display: inline-block; padding: 0.3rem 0.8rem; border: 1px solid rgba(196, 181, 253, 0.4); border-radius: 20px; background: rgba(139, 92, 246, 0.2); }
+        .project-card h3 { font-family: var(--font-display); font-size: 1.8rem; margin-bottom: 1rem; }
+
+        .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2.5rem; margin-top: 4rem; width: 100%; align-items: stretch; }
+        .pricing-card { background: rgba(15, 10, 30, 0.7); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 24px; padding: 3.5rem 2.5rem; display: flex; flex-direction: column; backdrop-filter: blur(20px); transition: transform 0.3s; }
+        .pricing-card.featured { border-color: var(--accent); background: rgba(30, 15, 60, 0.8); box-shadow: 0 0 50px rgba(139, 92, 246, 0.3); transform: scale(1.05); z-index: 2; }
+        .price { font-family: var(--font-display); font-size: 3.5rem; font-weight: 600; margin: 1.5rem 0; color: #fff; line-height: 1; }
+        .price span { font-family: var(--font-body); font-size: 1rem; color: var(--text-muted); font-weight: 400; }
+        .features-list { list-style: none; margin: 2rem 0 3rem 0; flex-grow: 1; }
+        .features-list li { font-size: 1rem; color: var(--text-muted); margin-bottom: 1.2rem; display: flex; align-items: flex-start; gap: 12px; line-height: 1.5; }
+        .features-list li::before { content: '✦'; color: var(--accent-light); font-size: 0.9rem; margin-top: 3px; }
+
+        .glass-panel { background: rgba(15, 10, 30, 0.85); backdrop-filter: blur(30px); border: 1px solid rgba(167, 139, 250, 0.4); border-radius: 24px; padding: 3.5rem; max-width: 650px; width: 100%; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8); margin: 0 auto; }
+        .form-group { margin-bottom: 1.8rem; text-align: left; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.8rem; }
+        label { display: block; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500; }
+        input, textarea { width: 100%; padding: 1.1rem; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 12px; color: #fff; font-family: var(--font-body); font-size: 1rem; transition: all 0.3s; }
+        input:focus, textarea:focus { outline: none; border-color: var(--accent-light); box-shadow: 0 0 15px rgba(139, 92, 246, 0.2); }
+        input[type="date"], input[type="time"] { color-scheme: dark; }
+        .status-message { margin-top: 1.5rem; padding: 1rem; border-radius: 8px; font-size: 0.9rem; display: none; line-height: 1.5; }
+        .status-message.success { display: block; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+        .status-message.error { display: block; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+
+        @media (max-width: 768px) {
+            .nav-links a:not(.btn) { display: none; }
+            .form-row { grid-template-columns: 1fr; gap: 0; }
+            .pricing-card.featured { transform: scale(1); }
+            section { padding: 15vh 5vw 10vh 5vw; }
+            h1 { font-size: 2.8rem; }
+            .glass-panel { padding: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader"><div class="loader-text">Initialisation...</div></div>
+
+    <canvas id="webgl-canvas"></canvas>
+
+    <div id="intro-overlay">
+        <div class="intro-title" id="intro-title-text">SCALEUP INTELLIGENCE</div>
+        <div class="intro-subtitle">Scrollez pour entrer</div>
+    </div>
+
+    <!-- Zone de scroll réservée à la transition -->
+    <div id="scroll-spacer"></div>
+
+    <header class="nav-header" id="main-nav">
+        <div class="logo-container">
+            <div class="logo-icon"></div>
+            <div class="logo-text">ScaleUp<br>Intelligence</div>
+        </div>
+        <nav class="nav-links">
+            <a href="#realisations">Réalisations</a>
+            <a href="#tarifs">Tarifs</a>
+            <a href="#rdv" class="btn" style="padding: 0.8rem 1.5rem;">Prendre RDV</a>
+        </nav>
+    </header>
+
+    <div id="site-wrapper">
+        <main>
+            <section id="hero">
+                <div class="tagline-wow reveal-text">Tech. IA. SaaS.</div>
+                <h1 class="reveal-text">Nous transformons vos idées<br><span class="text-gradient">en entreprises.</span></h1>
+                <p class="reveal-text">ScaleUp Intelligence conçoit des sites web sur-mesure, immersifs et optimisés pour convertir. Marquez les esprits dès la première seconde.</p>
+                <div class="reveal-text">
+                    <a href="#rdv" class="btn btn-primary">Démarrer un projet</a>
+                </div>
+            </section>
+
+            <section id="expertise">
+                <div class="tagline-wow reveal-text">L'Approche ScaleUp</div>
+                <h2 class="reveal-text">Le code est notre toile.<br>Votre succès est notre objectif.</h2>
+                <p class="reveal-text">Oubliez les templates génériques. Nous développons des expériences numériques uniques. Que vous soyez un commerce local ou une entreprise tech, nous créons l'outil qu'il vous faut.</p>
+            </section>
+
+            <section id="realisations">
+                <div class="tagline-wow reveal-text">Nos Expériences</div>
+                <h2 class="reveal-text">Des projets qui ne laissent<br>pas indifférent.</h2>
+                <div class="grid-projects">
+                    <div class="project-card reveal-text">
+                        <span class="project-tag">3D Immersif</span>
+                        <h3>L'Écrin Moderne</h3>
+                        <p>Une visite virtuelle 3D pour un promoteur immobilier haut de gamme.</p>
+                    </div>
+                    <div class="project-card reveal-text">
+                        <span class="project-tag">WebGL</span>
+                        <h3>Nova Audio</h3>
+                        <p>Site vitrine pour une marque d'écouteurs. La 3D réagit au son.</p>
+                    </div>
+                    <div class="project-card reveal-text">
+                        <span class="project-tag">E-commerce</span>
+                        <h3>Atelier Vinyle</h3>
+                        <p>Boutique en ligne où les vinyles flottent en 3D.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tarifs">
+                <div class="tagline-wow reveal-text">Investissement</div>
+                <h2 class="reveal-text">Des offres claires,<br>sans surprise.</h2>
+                <div class="pricing-grid">
+                    <div class="pricing-card reveal-text">
+                        <h3>L'Essentiel</h3>
+                        <p style="font-size:0.95rem; margin-bottom:0;">Pour les commerces locaux.</p>
+                        <div class="price">990 € <span>/ projet</span></div>
+                        <ul class="features-list">
+                            <li>Site vitrine 1 à 5 pages</li>
+                            <li>Design responsive (mobile)</li>
+                            <li>Formulaire de contact</li>
+                            <li>Optimisation SEO de base</li>
+                        </ul>
+                        <a href="#rdv" class="btn" style="width:100%;">Choisir</a>
+                    </div>
+
+                    <div class="pricing-card featured reveal-text">
+                        <span class="project-tag" style="background:var(--gradient); color:#000; border:none;">Recommandé</span>
+                        <h3 style="margin-top:1.5rem;">Sur-Mesure</h3>
+                        <p style="font-size:0.95rem; margin-bottom:0;">Pour les entreprises ambitieuses.</p>
+                        <div class="price">1 990 € <span>/ projet</span></div>
+                        <ul class="features-list">
+                            <li>Tout l'Essentiel, plus :</li>
+                            <li>Animations avancées (GSAP)</li>
+                            <li>Intégration 3D / WebGL légère</li>
+                            <li>Stratégie de conversion (UX)</li>
+                        </ul>
+                        <a href="#rdv" class="btn btn-primary" style="width:100%;">Réserver un appel</a>
+                    </div>
+
+                    <div class="pricing-card reveal-text">
+                        <h3>Premium 3D</h3>
+                        <p style="font-size:0.95rem; margin-bottom:0;">Pour les marques d'exception.</p>
+                        <div class="price">4 900 € <span>/ projet</span></div>
+                        <ul class="features-list">
+                            <li>Tout le Sur-Mesure, plus :</li>
+                            <li>Scène 3D immersive (Three.js)</li>
+                            <li>Shaders personnalisés & effets</li>
+                            <li>Direction artistique complète</li>
+                        </ul>
+                        <a href="#rdv" class="btn" style="width:100%;">Choisir</a>
+                    </div>
+                </div>
+            </section>
+
+            <section id="rdv">
+                <div class="glass-panel reveal-text">
+                    <div style="text-align:center; margin-bottom:2.5rem;">
+                        <h2 style="font-size:2.4rem; margin-bottom:1rem;">Parlons de votre projet.</h2>
+                        <p style="font-size:1.05rem; margin:0 auto; max-width:450px;">Choisissez un créneau. Je vous appellerai personnellement.</p>
+                    </div>
+                    
+                    <form id="booking-form">
+                        <div class="form-group">
+                            <label for="name">Votre nom</label>
+                            <input type="text" id="name" required placeholder="Ex: Jean Dupont">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="phone">Votre numéro de téléphone</label>
+                            <input type="tel" id="phone" required placeholder="Ex: 06 12 34 56 78">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="date">Date de l'appel</label>
+                                <input type="date" id="date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="time">Heure de l'appel</label>
+                                <input type="time" id="time" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="message">Votre projet (optionnel)</label>
+                            <textarea id="message" rows="3" placeholder="Parlez-moi rapidement de votre projet..."></textarea>
+                        </div>
+
+                        <button type="submit" id="submit-btn" class="btn btn-primary" style="width:100%;">Confirmer le rendez-vous</button>
+                        <div id="form-status" class="status-message"></div>
+                    </form>
+
+                    <div style="text-align:center; margin-top:2.5rem; font-size:0.95rem; color:var(--text-muted);">
+                        Ou contactez-moi directement : <br>
+                        <a href="mailto:scaleupintelligencecontact@gmail.com" style="color:var(--accent-light); text-decoration:none;">scaleupintelligencecontact@gmail.com</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // --- SETUP 3D ---
+        const canvas = document.querySelector('#webgl-canvas');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x05030a, 0.03);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 15);
+
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.2, 0.1, 0.95);
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // Optimisation Mobile (Moins de charge pour éviter les crashs)
+        const isMobile = window.matchMedia("(max-width: 768px)").matches;
+        const ringCount = isMobile ? 6 : 12;
+        const particleCount = isMobile ? 500 : 2000;
+
+        // --- LE VORTEX ---
+        const portalGroup = new THREE.Group();
+        scene.add(portalGroup);
+        const rings = [];
+        
+        for(let i=0; i<ringCount; i++) {
+            const radius = 4 - (i * 0.3);
+            const geo = new THREE.TorusGeometry(radius, 0.04, isMobile ? 16 : 64, 100);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: i % 2 === 0 ? 0x8b5cf6 : 0xc4b5fd, 
+                transparent: false,
+            });
+            const ring = new THREE.Mesh(geo, mat);
+            ring.position.z = -i * 1.5;
+            ring.userData.baseZ = ring.position.z;
+            portalGroup.add(ring);
+            rings.push(ring);
+        }
+
+        const particleGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = [];
+
+        for(let i=0; i<particleCount; i++) {
+            const r = Math.random() * 8 + 1;
+            const theta = Math.random() * Math.PI * 2;
+            positions[i*3] = Math.cos(theta) * r;
+            positions[i*3+1] = Math.sin(theta) * r;
+            positions[i*3+2] = (Math.random() - 0.5) * 20;
+            velocities.push({ r: r, theta: theta, speed: (Math.random() * 0.05) + 0.01, zSpeed: (Math.random() * 0.1) + 0.02 });
+        }
+
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const particleMat = new THREE.PointsMaterial({ size: 0.06, color: 0xc4b5fd, transparent: true, opacity: 0.8 });
+        const vortexParticles = new THREE.Points(particleGeo, particleMat);
+        portalGroup.add(vortexParticles);
+
+        const portalLight = new THREE.PointLight(0x8b5cf6, 20, 20);
+        portalGroup.add(portalLight);
+
+        // --- ARRIÈRE-PLAN 3D DU SITE ---
+        const siteBgGroup = new THREE.Group();
+        siteBgGroup.visible = false;
+        scene.add(siteBgGroup);
+        const gridGeo = new THREE.PlaneGeometry(100, 100, 40, 40);
+        const gridMat = new THREE.MeshBasicMaterial({ color: 0x8b5cf6, wireframe: true, transparent: true, opacity: 0.08 });
+        const grid = new THREE.Mesh(gridGeo, gridMat);
+        grid.rotation.x = -Math.PI / 2;
+        grid.position.y = -5;
+        siteBgGroup.add(grid);
+
+        // --- LENIS SCROLL ---
+        const lenis = new Lenis({ 
+            duration: 1.2, 
+            smooth: true,
+            smoothTouch: true, // Très important pour le mobile
+            lerp: 0.08
+        });
+        function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+        requestAnimationFrame(raf);
+
+        gsap.registerPlugin(ScrollTrigger);
+
+        gsap.to(".intro-title", { opacity: 1, y: 0, duration: 1.5, ease: "power3.out", delay: 0.5 });
+        gsap.to(".intro-subtitle", { opacity: 1, duration: 1.5, delay: 1 });
+
+        // --- TIMELINE DE TRANSITION (ZERO FLASH) ---
+        ScrollTrigger.create({
+            trigger: "#scroll-spacer", 
+            start: "top top",
+            end: "bottom top",
+            scrub: 1,
+            onUpdate: (self) => {
+                const p = self.progress;
+                
+                gsap.set(".intro-title", { opacity: Math.max(0, 1 - (p * 4)) });
+                gsap.set(".intro-subtitle", { opacity: Math.max(0, 1 - (p * 6)) });
+
+                camera.position.z = 15 - (p * 14); 
+                
+                portalGroup.rotation.z = p * Math.PI * 2;
+                rings.forEach((ring) => {
+                    ring.position.z = ring.userData.baseZ + (p * 20);
+                    if(ring.position.z > 2) ring.position.z -= 20;
+                });
+            },
+            onLeave: () => {
+                // 1. Cacher l'intro et l'espaceur instantanément
+                document.getElementById('intro-overlay').style.display = 'none';
+                document.getElementById('scroll-spacer').style.display = 'none';
+                
+                // 2. Afficher le site en dessous
+                const siteWrapper = document.getElementById('site-wrapper');
+                siteWrapper.style.opacity = 1;
+                siteWrapper.style.visibility = 'visible';
+                siteWrapper.style.pointerEvents = 'auto';
+                
+                const mainNav = document.getElementById('main-nav');
+                mainNav.style.opacity = 1;
+                mainNav.style.pointerEvents = 'auto';
+
+                // 3. On cache l'intro 3D et on affiche le décor du site
+                portalGroup.visible = false;
+                siteBgGroup.visible = true;
+
+                // 4. LA CLÉ : Le scroll est réinitialisé de manière native et instantanée.
+                // Puisque l'espaceur a disparu, il n'y a AUCUN saut visible. C'est fluide.
+                window.scrollTo(0, 0);
+
+                // 5. On anime l'apparition du texte
+                document.querySelectorAll('.reveal-text').forEach((el) => {
+                    gsap.fromTo(el, { opacity: 0, y: 40 }, { 
+                        opacity: 1, y: 0, duration: 1, 
+                        scrollTrigger: { trigger: el, start: 'top 85%' } 
+                    });
+                });
+            }
+        });
+
+        // --- BOUCLE D'ANIMATION 3D ---
+        const clock = new THREE.Clock();
+        const posArray = particleGeo.attributes.position.array;
+        const mouse = new THREE.Vector2();
+        let targetMouse = new THREE.Vector2();
+
+        window.addEventListener('mousemove', (e) => {
+            targetMouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            targetMouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsed = clock.getElapsedTime();
+            
+            mouse.x += (targetMouse.x - mouse.x) * 0.05;
+            mouse.y += (targetMouse.y - mouse.y) * 0.05;
+
+            if(portalGroup.visible) {
+                for(let i=0; i<particleCount; i++) {
+                    const v = velocities[i];
+                    v.theta += v.speed * 0.1;
+                    v.z += v.zSpeed;
+                    if(v.z > 10) v.z = -30;
+                    posArray[i*3] = Math.cos(v.theta) * v.r;
+                    posArray[i*3+1] = Math.sin(v.theta) * v.r;
+                    posArray[i*3+2] = v.z;
+                }
+                particleGeo.attributes.position.needsUpdate = true;
+                portalLight.intensity = 20 + Math.sin(elapsed * 3) * 5;
+            }
+
+            if(siteBgGroup.visible) {
+                grid.position.z = (elapsed * 2) % 10;
+                siteBgGroup.rotation.y += (mouse.x * 0.1 - siteBgGroup.rotation.y) * 0.05;
+                siteBgGroup.rotation.x += (mouse.y * 0.05 - siteBgGroup.rotation.x) * 0.05;
+            }
+
+            composer.render();
+        }
+        animate();
+
+        setTimeout(() => document.getElementById('loader').classList.add('hidden'), 1000);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- FORMULAIRE (NE PAS TOUCHER) ---
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwk1xAV__x39UcEAKzR4URtAZpDpuN329_J1R8vBsfZWm_v9QPTyTmlIoBo-IZZLfe3xA/exec'; // À remplacer
+        const form = document.getElementById('booking-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const statusDiv = document.getElementById('form-status');
+        const dateInput = document.getElementById('date');
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.min = today;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const phone = document.getElementById('phone').value;
+            const date = document.getElementById('date').value;
+            const time = document.getElementById('time').value;
+            const message = document.getElementById('message').value || 'Pas de message';
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Envoi en cours...';
+            statusDiv.className = 'status-message';
+            statusDiv.style.display = 'none';
+
+            const payload = { name, phone, date, time, message };
+
+            try {
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    statusDiv.className = 'status-message success';
+                    statusDiv.innerHTML = `✓ Rendez-vous confirmé.<br>Je vous appellerai le <b>${date}</b> à <b>${time}</b>.`;
+                    form.reset();
+                } else {
+                    throw new Error('Erreur serveur');
+                }
+            } catch (error) {
+                statusDiv.className = 'status-message error';
+                statusDiv.textContent = 'Une erreur est survenue. Veuillez réessayer.';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Confirmer le rendez-vous';
+            }
+        });
+    </script>
+</body>
+</html>
